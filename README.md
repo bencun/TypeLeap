@@ -1,6 +1,9 @@
-# FrogFind
+# TypeLeap
 
-FrogFind is a vintage-computer-friendly search and reader proxy. This version runs as a modern Node.js + TypeScript service while keeping the output intentionally simple for old browsers.
+TypeLeap is a version of [FrogFind](https://github.com/ActionRetro/FrogFind) that runs as a modern Node.js + TypeScript service while keeping the output intentionally simple for old browsers.
+
+## Project status
+The current version is a one-shotted vibe-coded port of the original. Completely untested.
 
 ## Run locally
 
