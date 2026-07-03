@@ -10,10 +10,16 @@ export type SearchResult = {
   snippet: string;
 };
 
+/**
+ * Builds the DuckDuckGo HTML search endpoint for a query string.
+ */
 export function duckDuckGoSearchUrl(query: string): string {
   return `https://html.duckduckgo.com/html?q=${encodeURIComponent(query)}`;
 }
 
+/**
+ * Extracts TypeLeap search results from DuckDuckGo HTML output.
+ */
 export function parseSearchResults(html: string): SearchResult[] {
   const $ = cheerio.load(cleanText(html).replaceAll("strong>", "b>").replaceAll("em>", "i>"));
   const results: SearchResult[] = [];
@@ -45,6 +51,9 @@ export function parseSearchResults(html: string): SearchResult[] {
   return results;
 }
 
+/**
+ * Fetches DuckDuckGo results and renders the vintage search page.
+ */
 export async function searchPage(query: string): Promise<string> {
   let errorText = "";
   let results: SearchResult[] = [];

@@ -27,6 +27,9 @@ const allowedReaderTags = new Set([
   "h6"
 ]);
 
+/**
+ * Strips unsupported markup and leaves only the vintage-safe reader tags.
+ */
 export function rewriteReaderContent(content: string): string {
   const $ = cheerio.load(content, null, false);
 
@@ -57,6 +60,9 @@ export function rewriteReaderContent(content: string): string {
     .replace(/href="http/gi, 'href="/read?a=http');
 }
 
+/**
+ * Renders the list of linked images discovered in a reader page.
+ */
 export function imageLinks(images: string[]): string {
   const links = images
     .filter(hasAllowedImageExtension)
@@ -69,6 +75,9 @@ export function imageLinks(images: string[]): string {
   return `<p><small>View page images:${links.join("")}</small></p>`;
 }
 
+/**
+ * Proxies non-HTML downloads through TypeLeap when the payload is small enough.
+ */
 export async function proxyDownload(url: string, headResponse: globalThis.Response): Promise<globalThis.Response | null> {
   const contentType = normalizeContentType(headResponse.headers.get("content-type"));
   const contentLength = Number(headResponse.headers.get("content-length") ?? 0);
@@ -101,6 +110,9 @@ export async function proxyDownload(url: string, headResponse: globalThis.Respon
   });
 }
 
+/**
+ * Fetches an article, runs it through Readability, and renders the reader page.
+ */
 export async function readerPage(articleUrl: string): Promise<string | globalThis.Response> {
   if (!isHttpUrl(articleUrl)) {
     return vintagePage("TypeLeap!", "That's not a web page :(");

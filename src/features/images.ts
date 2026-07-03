@@ -4,15 +4,24 @@ import { fetchBuffer } from "../shared/http.js";
 import { escapeHtml, vintagePage } from "../shared/html.js";
 import { isHttpUrl } from "../shared/url.js";
 
+/**
+ * Returns true when the URL points at a supported image extension.
+ */
 export function hasAllowedImageExtension(value: string): boolean {
   const lower = value.toLowerCase();
   return allowedImageExtensions.some((extension) => lower.includes(extension));
 }
 
+/**
+ * Returns true when the URL is both HTTP(S) and points at a supported image.
+ */
 export function isSupportedImageUrl(value: string): boolean {
   return isHttpUrl(value) && hasAllowedImageExtension(value);
 }
 
+/**
+ * Renders the minimal image viewer page with a compressed-image link.
+ */
 export function imageViewerPage(url: string, referer = "/"): string {
   return vintagePage(
     "TypeLeap Image Viewer",
@@ -24,6 +33,9 @@ export function imageViewerPage(url: string, referer = "/"): string {
   );
 }
 
+/**
+ * Downloads, downsizes, and re-encodes a supported image for old browsers.
+ */
 export async function compressedImage(url: string): Promise<{ buffer: Buffer; contentType: "jpg" | "png" } | null> {
   if (!isSupportedImageUrl(url)) {
     return null;

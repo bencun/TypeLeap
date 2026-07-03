@@ -1,5 +1,8 @@
 import { escapeHtml, vintagePage } from "../shared/html.js";
 
+/**
+ * Renders the search form that appears at the top of TypeLeap pages.
+ */
 export function searchForm(query: string): string {
   return `<form action="/" method="get">
 <a href="/"><font size=6 color="#008000">Type</font><font size=6 color="#000000">Leap!</font></a> Leap again: <input type="text" size="30" name="q" value="${escapeHtml(query)}">
@@ -7,6 +10,9 @@ export function searchForm(query: string): string {
 </form>`;
 }
 
+/**
+ * Renders the TypeLeap home page.
+ */
 export function homepage(): string {
   return vintagePage(
     "TypeLeap!",
@@ -25,6 +31,9 @@ Leap to: <input type="text" size="30" name="q"><br>
   );
 }
 
+/**
+ * Renders the TypeLeap about page.
+ */
 export function aboutPage(): string {
   return vintagePage(
     "TypeLeap!",
