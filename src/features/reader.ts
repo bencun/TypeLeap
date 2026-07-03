@@ -1,11 +1,10 @@
 import { Readability } from "@mozilla/readability";
 import * as cheerio from "cheerio";
 import { JSDOM } from "jsdom";
-import { compatibleContentTypes, htmlDownloadMaxBytes, proxyDownloadMaxBytes } from "../config.js";
 import { cacheKey, pageCache } from "../shared/cache.js";
-import { fetchWithTimeout, readLimitedBody } from "../shared/http.js";
+import { fetchReaderResource } from "../shared/http.js";
 import { cleanText, escapeHtml, vintagePage } from "../shared/html.js";
-import { isHttpUrl, normalizeContentType } from "../shared/url.js";
+import { isHttpUrl } from "../shared/url.js";
 import { hasAllowedImageExtension } from "./images.js";
 
 const allowedReaderTags = new Set([
@@ -84,68 +83,6 @@ export function imageLinks(images: string[]): string {
 }
 
 /**
- * Proxies non-HTML downloads through TypeLeap when the payload is small enough.
- */
-export async function proxyDownload(url: string, response: globalThis.Response): Promise<globalThis.Response | null> {
-  if (!response.ok) {
-    logReaderEvent(
-      "warn",
-      "proxy-skip",
-      url,
-      `GET response was HTTP ${response.status} ${response.statusText || "Unknown status"}`
-    );
-    return null;
-  }
-
-  const contentType = normalizeContentType(response.headers.get("content-type"));
-
-  if (!contentType) {
-    logReaderEvent("warn", "proxy-skip", url, "GET response did not include usable content-type");
-    return null;
-  }
-
-  if (compatibleContentTypes.includes(contentType)) {
-    logReaderEvent("warn", "proxy-skip", url, `content-type ${contentType} is already readable`);
-    return null;
-  }
-
-  const contentLength = Number(response.headers.get("content-length") ?? 0);
-
-  if (contentLength > proxyDownloadMaxBytes) {
-    logReaderEvent("warn", "proxy-block", url, `content-length ${contentLength} exceeds max ${proxyDownloadMaxBytes}`);
-    return new globalThis.Response(
-      `Failed to proxy file download, it's too large. :( <br>You can try downloading the file directly: ${escapeHtml(url)}`,
-      { headers: { "content-type": "text/html; charset=utf-8" } }
-    );
-  }
-
-  logReaderEvent("warn", "proxy-download", url, `proxying ${contentType} with declared length ${contentLength}`);
-  const parsedUrl = new URL(url);
-  const filename = parsedUrl.pathname.split("/").filter(Boolean).pop() || "download";
-  const headers: HeadersInit = {
-    "content-type": contentType,
-    "content-disposition": `attachment; filename="${filename.replaceAll('"', "")}"`
-  };
-
-  if (contentLength > 0) {
-    headers["content-length"] = String(contentLength);
-
-    return new globalThis.Response(response.body, {
-      headers
-    });
-  }
-
-  const body = await readLimitedBody(response, proxyDownloadMaxBytes);
-
-  return new globalThis.Response(body, {
-    headers: {
-      ...headers,
-      "content-length": String(body.byteLength)
-    }
-  });
-}
-
-/**
  * Fetches an article, runs it through Readability, and renders the reader page.
  */
 export async function readerPage(articleUrl: string): Promise<string | globalThis.Response> {
@@ -165,27 +102,22 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
   let article;
 
   try {
-    const response = await fetchWithTimeout(articleUrl);
+    const resource = await fetchReaderResource(articleUrl);
 
-    if (!response.ok) {
-      throw new Error(`Request failed with HTTP ${response.status}`);
+    if (resource.kind === "download") {
+      return resource.response;
     }
 
-    const proxiedDownload = await proxyDownload(articleUrl, response);
-
-    if (proxiedDownload) {
-      return proxiedDownload;
-    }
-
-    const articleHtml = new TextDecoder().decode(await readLimitedBody(response, htmlDownloadMaxBytes));
+    const { body: articleHtml, contentType } = resource;
     logReaderEvent("warn", "get-ok", articleUrl, `fetched ${articleHtml.length} bytes`);
     dom = new JSDOM(articleHtml, { url: articleUrl });
     article = new Readability(dom.window.document, {
       keepClasses: false
     }).parse();
+    logReaderEvent("warn", "parse-ok", articleUrl, `content-type ${contentType || "unknown"}`);
   } catch (error) {
     logReaderEvent("error", "get-failed", articleUrl, error instanceof Error ? error.message : "Unexpected error");
-    errorText += error instanceof Error ? `Sorry! ${escapeHtml(error.message)}<br>` : "Failed to get the article :( <br>";
+    errorText += readerFetchErrorHtml(error);
   }
 
   const title = cleanText(article?.title ?? articleUrl);
@@ -212,4 +144,8 @@ ${errorText ? `<p><font color='red'>${errorText}</font></p>` : ""}
   }
 
   return page;
+}
+
+function readerFetchErrorHtml(error: unknown): string {
+  return error instanceof Error ? `Sorry! ${escapeHtml(error.message)}<br>` : "Failed to get the article :( <br>";
 }

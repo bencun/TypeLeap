@@ -1,6 +1,36 @@
 import { type Request, type Response } from "express";
-import { fetchTimeoutMs, htmlDownloadMaxBytes, imageDownloadMaxBytes, typeLeapUserAgent } from "../config.js";
+import {
+  browserUserAgent,
+  fetchTimeoutMs,
+  htmlDownloadMaxBytes,
+  imageDownloadMaxBytes,
+  proxyDownloadMaxBytes,
+  typeLeapUserAgent
+} from "../config.js";
+import { escapeHtml } from "./html.js";
 import { normalizeContentType } from "./url.js";
+
+export type FetchedPage = {
+  body: string;
+  contentType: string;
+};
+
+export type ReaderResource =
+  | {
+      kind: "page";
+      body: string;
+      contentType: string;
+    }
+  | {
+      kind: "download";
+      response: globalThis.Response;
+    };
+
+export class UnsupportedContentTypeError extends Error {
+  constructor(readonly contentType: string) {
+    super(`Unsupported fetched content type: ${contentType || "unknown"}`);
+  }
+}
 
 /**
  * Reads a query parameter as a string from an Express request.
@@ -20,6 +50,104 @@ export async function fetchWithTimeout(url: string, init: RequestInit = {}): Pro
     headers: {
       "user-agent": typeLeapUserAgent,
       ...init.headers
+    }
+  });
+}
+
+/**
+ * Fetches a reader page with browser-like headers and returns HTML/text unchanged.
+ */
+export async function fetchHtmlPage(url: string): Promise<FetchedPage> {
+  const resource = await fetchReaderResource(url);
+
+  if (resource.kind === "download") {
+    throw new UnsupportedContentTypeError(resource.response.headers.get("content-type") ?? "");
+  }
+
+  return {
+    body: resource.body,
+    contentType: resource.contentType
+  };
+}
+
+/**
+ * Fetches a reader target and returns either readable page text or a small proxied download.
+ */
+export async function fetchReaderResource(url: string): Promise<ReaderResource> {
+  const response = await fetchReaderResponse(url, browserUserAgent);
+
+  if (isCloudflareChallenge(response)) {
+    return responseToReaderResource(url, await fetchReaderResponse(url, typeLeapUserAgent));
+  }
+
+  return responseToReaderResource(url, response);
+}
+
+async function fetchReaderResponse(url: string, userAgent: string): Promise<globalThis.Response> {
+  return fetchWithTimeout(url, {
+    headers: {
+      "user-agent": userAgent,
+      accept: "text/html;q=1.0, application/xhtml+xml;q=0.9, text/plain;q=0.8, */*;q=0.1",
+      "accept-language": "en-US,en;q=0.9"
+    }
+  });
+}
+
+async function responseToReaderResource(url: string, response: globalThis.Response): Promise<ReaderResource> {
+  if (!response.ok) {
+    throw new Error(`Request failed with HTTP ${response.status}`);
+  }
+
+  const contentType = response.headers.get("content-type") ?? "";
+  const mime = normalizeContentType(contentType);
+
+  if (isReaderPageMime(mime)) {
+    const body = new TextDecoder().decode(await readLimitedBody(response, htmlDownloadMaxBytes));
+    return { kind: "page", body, contentType };
+  }
+
+  return {
+    kind: "download",
+    response: await proxiedDownloadResponse(url, response, contentType, mime)
+  };
+}
+
+function isReaderPageMime(mime: string): boolean {
+  return !mime || mime === "text/html" || mime === "application/xhtml+xml" || mime === "text/plain";
+}
+
+function isCloudflareChallenge(response: globalThis.Response): boolean {
+  return response.status === 403 && response.headers.get("cf-mitigated") === "challenge";
+}
+
+async function proxiedDownloadResponse(
+  url: string,
+  response: globalThis.Response,
+  contentType: string,
+  mime: string
+): Promise<globalThis.Response> {
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
+
+  if (contentLength > proxyDownloadMaxBytes) {
+    return new globalThis.Response(
+      `Failed to proxy file download, it's too large. :( <br>You can try downloading the file directly: ${escapeHtml(url)}`,
+      { headers: { "content-type": "text/html; charset=utf-8" } }
+    );
+  }
+
+  const parsedUrl = new URL(url);
+  const filename = parsedUrl.pathname.split("/").filter(Boolean).pop() || "download";
+  const headers: HeadersInit = {
+    "content-type": contentType || mime || "application/octet-stream",
+    "content-disposition": `attachment; filename="${filename.replaceAll('"', "")}"`
+  };
+
+  const body = await readLimitedBody(response, proxyDownloadMaxBytes);
+
+  return new globalThis.Response(body, {
+    headers: {
+      ...headers,
+      "content-length": String(body.byteLength)
     }
   });
 }

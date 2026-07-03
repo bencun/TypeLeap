@@ -4,7 +4,7 @@ import { readerPage } from "./features/reader.js";
 import { searchPage } from "./features/search.js";
 import { aboutPage, homepage } from "./pages/static.js";
 import { cacheKey, pageCache } from "./shared/cache.js";
-import { sendWebResponse, queryValue } from "./shared/http.js";
+import { queryValue, sendWebResponse } from "./shared/http.js";
 import { escapeHtml, vintagePage } from "./shared/html.js";
 
 export type BinaryRouteResult = {
