@@ -1,5 +1,5 @@
 import { type Request, type Response } from "express";
-import { frogFindUserAgent } from "../config.js";
+import { typeLeapUserAgent } from "../config.js";
 import { normalizeContentType } from "./url.js";
 
 export function queryValue(request: Request, name: string): string {
@@ -10,7 +10,7 @@ export function queryValue(request: Request, name: string): string {
 export async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, {
     headers: {
-      "user-agent": frogFindUserAgent
+      "user-agent": typeLeapUserAgent
     }
   });
 
@@ -24,7 +24,7 @@ export async function fetchText(url: string): Promise<string> {
 export async function fetchBuffer(url: string): Promise<{ data: ArrayBuffer; contentType: string }> {
   const response = await fetch(url, {
     headers: {
-      "user-agent": frogFindUserAgent
+      "user-agent": typeLeapUserAgent
     }
   });
 
@@ -59,4 +59,3 @@ export async function sendWebResponse(webResponse: globalThis.Response, response
 
   response.end();
 }
-

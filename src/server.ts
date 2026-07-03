@@ -4,6 +4,5 @@ const port = Number(process.env.PORT ?? 3000);
 const app = createApp();
 
 app.listen(port, () => {
-  console.log(`FrogFind listening on http://localhost:${port}`);
+  console.log(`TypeLeap listening on http://localhost:${port}`);
 });
-

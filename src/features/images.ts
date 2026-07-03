@@ -15,7 +15,7 @@ export function isSupportedImageUrl(value: string): boolean {
 
 export function imageViewerPage(url: string, referer = "/"): string {
   return vintagePage(
-    "FrogFind Image Viewer",
+    "TypeLeap Image Viewer",
     `<small><a href="${escapeHtml(referer)}">< Back to previous page</a></small>
 <p><small><b>Viewing image:</b> ${escapeHtml(url)}</small></p>
 <img src="/image-compressed?i=${encodeURIComponent(url)}">
@@ -50,4 +50,3 @@ export async function compressedImage(url: string): Promise<{ buffer: Buffer; co
 
   return { buffer: await resized.jpeg({ quality: 80 }).toBuffer(), contentType: "jpg" };
 }
-

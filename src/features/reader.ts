@@ -103,7 +103,7 @@ export async function proxyDownload(url: string, headResponse: globalThis.Respon
 
 export async function readerPage(articleUrl: string): Promise<string | globalThis.Response> {
   if (!isHttpUrl(articleUrl)) {
-    return vintagePage("FrogFind!", "That's not a web page :(");
+    return vintagePage("TypeLeap!", "That's not a web page :(");
   }
 
   let errorText = "";
@@ -140,7 +140,7 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
     title,
     `<p>
 <form action="/read" method="get">
-<a href="/">Back to <b><font color="#008000">Frog</font><font color="000000">Find!</font></a></b> | Browsing URL: <input type="text" size="38" name="a" value="${escapeHtml(articleUrl)}">
+<a href="/">Back to <b><font color="#008000">Type</font><font color="000000">Leap!</font></a></b> | Browsing URL: <input type="text" size="38" name="a" value="${escapeHtml(articleUrl)}">
 <input type="submit" value="Go!">
 </form>
 </p>
@@ -151,4 +151,3 @@ ${errorText ? `<p><font color='red'>${errorText}</font></p>` : ""}
 <p><font size="4">${readableArticle}</font></p>`
   );
 }
-

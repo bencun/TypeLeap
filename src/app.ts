@@ -48,7 +48,7 @@ export function createApp(): express.Express {
     const url = queryValue(request, "i");
 
     if (!url || !isSupportedImageUrl(url)) {
-      response.type("html").send(vintagePage("FrogFind Image Viewer", "Image failed :("));
+      response.type("html").send(vintagePage("TypeLeap Image Viewer", "Image failed :("));
       return;
     }
 
@@ -89,9 +89,8 @@ export function createApp(): express.Express {
 
   app.use((error: unknown, _request: Request, response: ExpressResponse, _next: express.NextFunction) => {
     const message = error instanceof Error ? error.message : "Unexpected server error";
-    response.status(500).type("html").send(vintagePage("FrogFind Error", `<p><font color='red'>${escapeHtml(message)}</font></p>`));
+    response.status(500).type("html").send(vintagePage("TypeLeap Error", `<p><font color='red'>${escapeHtml(message)}</font></p>`));
   });
 
   return app;
 }
-

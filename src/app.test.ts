@@ -33,7 +33,7 @@ describe("createApp routes", () => {
 
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/html");
-    expect(body).toContain("FrogFind!");
+    expect(body).toContain("TypeLeap!");
   });
 
   it("serves the about page", async () => {
@@ -41,7 +41,7 @@ describe("createApp routes", () => {
     const body = await response.text();
 
     expect(response.status).toBe(200);
-    expect(body).toContain("What in the world is FrogFind?");
+    expect(body).toContain("What in the world is TypeLeap?");
   });
 
   it("keeps the missing reader URL response", async () => {

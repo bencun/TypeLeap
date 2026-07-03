@@ -68,7 +68,7 @@ export async function searchPage(query: string): Promise<string> {
       : "<br>No results found.<br><br><hr>";
 
   return vintagePage(
-    "FrogFind!",
+    "TypeLeap!",
     `${searchForm(query)}
 <hr>
 <br>
@@ -79,4 +79,3 @@ ${errorText ? `<p><font color='red'>${errorText}</font></p>` : ""}
 ${resultHtml}`
   );
 }
-
