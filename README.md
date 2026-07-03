@@ -3,7 +3,7 @@
 TypeLeap is a version of [FrogFind](https://github.com/ActionRetro/FrogFind) that runs as a modern Node.js + TypeScript service while keeping the output intentionally simple for old browsers.
 
 ## Project status
-The current version is a one-shotted vibe-coded port of the original. Completely untested.
+The current version is a one-shotted vibe-coded port of the original with some (also) vibe-coded improvements.
 
 ## Run locally
 
