@@ -40,10 +40,6 @@ export function createApp(): express.Express {
     }
   });
 
-  app.get("/read.php", (request, response) => {
-    response.redirect(301, `/read?a=${encodeURIComponent(queryValue(request, "a"))}`);
-  });
-
   app.get("/image", (request, response) => {
     const url = queryValue(request, "i");
 
@@ -53,10 +49,6 @@ export function createApp(): express.Express {
     }
 
     response.type("html").send(imageViewerPage(url, request.get("referer") ?? "/"));
-  });
-
-  app.get("/image.php", (request, response) => {
-    response.redirect(301, `/image?i=${encodeURIComponent(queryValue(request, "i"))}`);
   });
 
   app.get("/image-compressed", async (request, response, next) => {
@@ -75,16 +67,8 @@ export function createApp(): express.Express {
     }
   });
 
-  app.get("/image_compressed.php", (request, response) => {
-    response.redirect(301, `/image-compressed?i=${encodeURIComponent(queryValue(request, "i"))}`);
-  });
-
   app.get("/about", (_request, response) => {
     response.type("html").send(aboutPage());
-  });
-
-  app.get("/about.php", (_request, response) => {
-    response.redirect(301, "/about");
   });
 
   app.use((error: unknown, _request: Request, response: ExpressResponse, _next: express.NextFunction) => {

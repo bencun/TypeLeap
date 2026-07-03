@@ -59,10 +59,4 @@ describe("createApp routes", () => {
     expect(body).toContain("Image failed :(");
   });
 
-  it("keeps legacy redirects", async () => {
-    const response = await fetch(`${baseUrl}/about.php`, { redirect: "manual" });
-
-    expect(response.status).toBe(301);
-    expect(response.headers.get("location")).toBe("/about");
-  });
 });
