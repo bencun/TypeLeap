@@ -4,5 +4,7 @@
 
 composer.phar
 /vendor/
+node_modules/
+dist/
 *.spc
 .DS_Store
