@@ -2,22 +2,29 @@ import express, { type Request, type Response as ExpressResponse } from "express
 import { compressedImage, imageViewerPage, isSupportedImageUrl } from "./features/images.js";
 import { readerPage } from "./features/reader.js";
 import { searchPage } from "./features/search.js";
-import { aboutPage, homepage } from "./pages/static.js";
+import { aboutPage, homepage, searchDisabledPage } from "./pages/static.js";
 import { cacheKey, pageCache } from "./shared/cache.js";
 import { queryValue, sendWebResponse } from "./shared/http.js";
 import { escapeHtml, vintagePage } from "./shared/html.js";
+import { isModernBrowserOnModernOs } from "./shared/user-agent.js";
 
 export type BinaryRouteResult = {
   buffer: Buffer;
   contentType: string;
 } | null;
 
-export async function homeRouteHtml(query: string): Promise<string> {
+export async function homeRouteHtml(query: string, userAgent = ""): Promise<string> {
+  const disableSearch = isModernBrowserOnModernOs(userAgent);
+
   if (query) {
+    if (disableSearch) {
+      return searchDisabledPage();
+    }
+
     return searchPage(query);
   }
 
-  return cachedStaticPage("home", homepage);
+  return cachedStaticPage(`home:${disableSearch ? "disabled" : "enabled"}`, () => homepage(disableSearch));
 }
 
 export async function readRouteResult(articleUrl: string): Promise<string | globalThis.Response> {
@@ -58,8 +65,9 @@ export async function imageCompressedRouteResult(url: string): Promise<BinaryRou
   };
 }
 
-export function aboutRouteHtml(): string {
-  return cachedStaticPage("about", aboutPage);
+export function aboutRouteHtml(userAgent = ""): string {
+  const disableSearch = isModernBrowserOnModernOs(userAgent);
+  return cachedStaticPage(`about:${disableSearch ? "disabled" : "enabled"}`, () => aboutPage(disableSearch));
 }
 
 function cachedStaticPage(name: string, render: () => string): string {
@@ -87,7 +95,7 @@ export function createApp(): express.Express {
   app.get("/", async (request, response, next) => {
     try {
       const query = queryValue(request, "q");
-      response.type("html").send(await homeRouteHtml(query));
+      response.type("html").send(await homeRouteHtml(query, request.get("user-agent") ?? ""));
     } catch (error) {
       next(error);
     }
@@ -142,7 +150,7 @@ export function createApp(): express.Express {
    * Serves the TypeLeap about page.
    */
   app.get("/about", (_request, response) => {
-    response.type("html").send(aboutRouteHtml());
+    response.type("html").send(aboutRouteHtml(_request.get("user-agent") ?? ""));
   });
 
   /**

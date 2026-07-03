@@ -3,7 +3,11 @@ import { escapeHtml, vintagePage } from "../shared/html.js";
 /**
  * Renders the search form that appears at the top of TypeLeap pages.
  */
-export function searchForm(query: string): string {
+export function searchForm(query: string, disabled = false): string {
+  if (disabled) {
+    return disabledSearchForm();
+  }
+
   return `<form action="/" method="get">
 <a href="/"><font size=6 color="#008000">Type</font><font size=6 color="#000000">Leap!</font></a> Leap again: <input type="text" size="30" name="q" value="${escapeHtml(query)}">
 <input type="submit" value="Ribbbit!">
@@ -13,17 +17,17 @@ export function searchForm(query: string): string {
 /**
  * Renders the TypeLeap home page.
  */
-export function homepage(): string {
+export function homepage(disableSearch = false): string {
   return vintagePage(
     "TypeLeap!",
     `<br><br><center><h1><font size=7><font color="#008000">Type</font>Leap!</font></h1></center>
 <center><h3>The Search Engine for Vintage Computers</h3></center>
 <br><br>
 <center>
-<form action="/" method="get">
+${disableSearch ? disabledSearchForm() : `<form action="/" method="get">
 Leap to: <input type="text" size="30" name="q"><br>
 <input type="submit" value="Ribbbit!">
-</form>
+</form>`}
 </center>
 <br><br><br>
 <small><center>Original <a href="https://github.com/ActionRetro/FrogFind">FrogFind</a> built by <b><a href="https://youtube.com/ActionRetro">Action Retro</a></b> on YouTube | <a href="/about">Why build such a thing?</a></center><br>
@@ -35,10 +39,10 @@ Leap to: <input type="text" size="30" name="q"><br>
 /**
  * Renders the TypeLeap about page.
  */
-export function aboutPage(): string {
+export function aboutPage(disableSearch = false): string {
   return vintagePage(
     "TypeLeap!",
-    `${searchForm("")}
+    `${searchForm("", disableSearch)}
 <hr>
 <br>
 <center>
@@ -54,5 +58,23 @@ The search functionality of TypeLeap is basically a custom wrapper for DuckDuckG
 TypeLeap is designed with classic computers in mind, especially low-resolution, low-color browsers. It should also work great on any text-based web browser!
 <h3>How can I get in touch with you?</h3>
 Send me an email! <a href="mailto:actionretro@pm.me">actionretro@pm.me</a>`
+  );
+}
+
+/**
+ * Renders the message shown to modern browsers instead of a search form.
+ */
+export function disabledSearchForm(): string {
+  return `<p><font color="red"><b>Search is only available from vintage web browsers.</b></font></p>`;
+}
+
+/**
+ * Renders the page shown when a modern browser tries to use the search endpoint.
+ */
+export function searchDisabledPage(): string {
+  return vintagePage(
+    "TypeLeap Search Disabled",
+    `${disabledSearchForm()}
+<p>TypeLeap search is reserved for old browsers and vintage computers. Try again from Internet Explorer, Netscape, early Firefox, or another classic browser.</p>`
   );
 }
