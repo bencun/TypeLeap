@@ -26,7 +26,8 @@ Leap to: <input type="text" size="30" name="q"><br>
 </form>
 </center>
 <br><br><br>
-<small><center>Built by <b><a href="https://youtube.com/ActionRetro">Action Retro</a></b> on YouTube | <a href="/about">Why build such a thing?</a></center><br>
+<small><center>Original <a href="https://github.com/ActionRetro/FrogFind">FrogFind</a> built by <b><a href="https://youtube.com/ActionRetro">Action Retro</a></b> on YouTube | <a href="/about">Why build such a thing?</a></center><br>
+<small><center>Rebuilt for Node.js by <b><a href="https://github.com/bencun">Bencun</a></b> on GitHub</center><br>
 <small><center>Powered by DuckDuckGo</center></small>`
   );
 }
