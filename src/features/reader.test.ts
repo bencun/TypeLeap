@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { rewriteReaderContent } from "./reader.js";
+import { proxyDownload, rewriteReaderContent } from "./reader.js";
 
 describe("rewriteReaderContent", () => {
   it("keeps vintage-safe tags and strips unsupported tags and attributes", () => {
@@ -15,5 +15,19 @@ describe("rewriteReaderContent", () => {
     expect(output).toContain('<a href="/read?a=https://example.com">Read</a>');
     expect(output).not.toContain("class=");
     expect(output).not.toContain("script");
+  });
+});
+
+describe("proxyDownload", () => {
+  it("skips non-ok HEAD responses", async () => {
+    const headResponse = new Response("<html>blocked</html>", {
+      status: 403,
+      headers: {
+        "content-type": "text/html",
+        "content-length": "20"
+      }
+    });
+
+    await expect(proxyDownload("https://example.com/article", headResponse)).resolves.toBeNull();
   });
 });

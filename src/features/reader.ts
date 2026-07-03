@@ -28,6 +28,13 @@ const allowedReaderTags = new Set([
 ]);
 
 /**
+ * Emits a compact reader log line for fetch diagnostics.
+ */
+function logReaderEvent(level: "warn" | "error", stage: string, articleUrl: string, detail: string): void {
+  console[level](`[reader] ${stage} ${articleUrl} - ${detail}`);
+}
+
+/**
  * Strips unsupported markup and leaves only the vintage-safe reader tags.
  */
 export function rewriteReaderContent(content: string): string {
@@ -79,24 +86,38 @@ export function imageLinks(images: string[]): string {
  * Proxies non-HTML downloads through TypeLeap when the payload is small enough.
  */
 export async function proxyDownload(url: string, headResponse: globalThis.Response): Promise<globalThis.Response | null> {
+  if (!headResponse.ok) {
+    logReaderEvent(
+      "warn",
+      "proxy-skip",
+      url,
+      `HEAD response was HTTP ${headResponse.status} ${headResponse.statusText || "Unknown status"}`
+    );
+    return null;
+  }
+
   const contentType = normalizeContentType(headResponse.headers.get("content-type"));
   const contentLength = Number(headResponse.headers.get("content-length") ?? 0);
 
   if (!contentType || !headResponse.headers.has("content-length")) {
+    logReaderEvent("warn", "proxy-skip", url, "HEAD response did not include usable content-type/content-length");
     return null;
   }
 
   if (compatibleContentTypes.includes(contentType)) {
+    logReaderEvent("warn", "proxy-skip", url, `content-type ${contentType} is already readable`);
     return null;
   }
 
   if (contentLength > proxyDownloadMaxBytes) {
+    logReaderEvent("warn", "proxy-block", url, `content-length ${contentLength} exceeds max ${proxyDownloadMaxBytes}`);
     return new globalThis.Response(
       `Failed to proxy file download, it's too large. :( <br>You can try downloading the file directly: ${escapeHtml(url)}`,
       { headers: { "content-type": "text/html; charset=utf-8" } }
     );
   }
 
+  logReaderEvent("warn", "proxy-download", url, `proxying ${contentType} with declared length ${contentLength}`);
   const downloadResponse = await fetch(url);
   const parsedUrl = new URL(url);
   const filename = parsedUrl.pathname.split("/").filter(Boolean).pop() || "download";
@@ -122,12 +143,20 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
 
   try {
     const headResponse = await fetch(articleUrl, { method: "HEAD" });
+
+    if (!headResponse.ok) {
+      logReaderEvent("warn", "head-failed", articleUrl, `HTTP ${headResponse.status} ${headResponse.statusText || "Unknown status"}`);
+    } else {
+      logReaderEvent("warn", "head-ok", articleUrl, `HTTP ${headResponse.status}`);
+    }
+
     const proxiedDownload = await proxyDownload(articleUrl, headResponse);
 
     if (proxiedDownload) {
       return proxiedDownload;
     }
-  } catch {
+  } catch (error) {
+    logReaderEvent("error", "head-exception", articleUrl, error instanceof Error ? error.message : "Unexpected error");
     errorText += "Failed to get the article, its server did not return expected details :( <br>";
   }
 
@@ -136,11 +165,13 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
 
   try {
     const articleHtml = await fetchText(articleUrl);
+    logReaderEvent("warn", "get-ok", articleUrl, `fetched ${articleHtml.length} bytes`);
     dom = new JSDOM(articleHtml, { url: articleUrl });
     article = new Readability(dom.window.document, {
       keepClasses: false
     }).parse();
   } catch (error) {
+    logReaderEvent("error", "get-failed", articleUrl, error instanceof Error ? error.message : "Unexpected error");
     errorText += error instanceof Error ? `Sorry! ${escapeHtml(error.message)}<br>` : "Failed to get the article :( <br>";
   }
 
