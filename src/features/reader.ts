@@ -1,8 +1,9 @@
 import { Readability } from "@mozilla/readability";
 import * as cheerio from "cheerio";
 import { JSDOM } from "jsdom";
-import { compatibleContentTypes, proxyDownloadMaxBytes } from "../config.js";
-import { fetchText } from "../shared/http.js";
+import { compatibleContentTypes, htmlDownloadMaxBytes, proxyDownloadMaxBytes } from "../config.js";
+import { cacheKey, pageCache } from "../shared/cache.js";
+import { fetchWithTimeout, readLimitedBody } from "../shared/http.js";
 import { cleanText, escapeHtml, vintagePage } from "../shared/html.js";
 import { isHttpUrl, normalizeContentType } from "../shared/url.js";
 import { hasAllowedImageExtension } from "./images.js";
@@ -85,22 +86,21 @@ export function imageLinks(images: string[]): string {
 /**
  * Proxies non-HTML downloads through TypeLeap when the payload is small enough.
  */
-export async function proxyDownload(url: string, headResponse: globalThis.Response): Promise<globalThis.Response | null> {
-  if (!headResponse.ok) {
+export async function proxyDownload(url: string, response: globalThis.Response): Promise<globalThis.Response | null> {
+  if (!response.ok) {
     logReaderEvent(
       "warn",
       "proxy-skip",
       url,
-      `HEAD response was HTTP ${headResponse.status} ${headResponse.statusText || "Unknown status"}`
+      `GET response was HTTP ${response.status} ${response.statusText || "Unknown status"}`
     );
     return null;
   }
 
-  const contentType = normalizeContentType(headResponse.headers.get("content-type"));
-  const contentLength = Number(headResponse.headers.get("content-length") ?? 0);
+  const contentType = normalizeContentType(response.headers.get("content-type"));
 
-  if (!contentType || !headResponse.headers.has("content-length")) {
-    logReaderEvent("warn", "proxy-skip", url, "HEAD response did not include usable content-type/content-length");
+  if (!contentType) {
+    logReaderEvent("warn", "proxy-skip", url, "GET response did not include usable content-type");
     return null;
   }
 
@@ -108,6 +108,8 @@ export async function proxyDownload(url: string, headResponse: globalThis.Respon
     logReaderEvent("warn", "proxy-skip", url, `content-type ${contentType} is already readable`);
     return null;
   }
+
+  const contentLength = Number(response.headers.get("content-length") ?? 0);
 
   if (contentLength > proxyDownloadMaxBytes) {
     logReaderEvent("warn", "proxy-block", url, `content-length ${contentLength} exceeds max ${proxyDownloadMaxBytes}`);
@@ -118,15 +120,27 @@ export async function proxyDownload(url: string, headResponse: globalThis.Respon
   }
 
   logReaderEvent("warn", "proxy-download", url, `proxying ${contentType} with declared length ${contentLength}`);
-  const downloadResponse = await fetch(url);
   const parsedUrl = new URL(url);
   const filename = parsedUrl.pathname.split("/").filter(Boolean).pop() || "download";
+  const headers: HeadersInit = {
+    "content-type": contentType,
+    "content-disposition": `attachment; filename="${filename.replaceAll('"', "")}"`
+  };
 
-  return new globalThis.Response(downloadResponse.body, {
+  if (contentLength > 0) {
+    headers["content-length"] = String(contentLength);
+
+    return new globalThis.Response(response.body, {
+      headers
+    });
+  }
+
+  const body = await readLimitedBody(response, proxyDownloadMaxBytes);
+
+  return new globalThis.Response(body, {
     headers: {
-      "content-type": contentType,
-      "content-length": String(contentLength),
-      "content-disposition": `attachment; filename="${filename.replaceAll('"', "")}"`
+      ...headers,
+      "content-length": String(body.byteLength)
     }
   });
 }
@@ -139,32 +153,31 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
     return vintagePage("TypeLeap!", "That's not a web page :(");
   }
 
-  let errorText = "";
+  const key = cacheKey("reader", articleUrl);
+  const cached = pageCache.get<string>(key);
 
-  try {
-    const headResponse = await fetch(articleUrl, { method: "HEAD" });
-
-    if (!headResponse.ok) {
-      logReaderEvent("warn", "head-failed", articleUrl, `HTTP ${headResponse.status} ${headResponse.statusText || "Unknown status"}`);
-    } else {
-      logReaderEvent("warn", "head-ok", articleUrl, `HTTP ${headResponse.status}`);
-    }
-
-    const proxiedDownload = await proxyDownload(articleUrl, headResponse);
-
-    if (proxiedDownload) {
-      return proxiedDownload;
-    }
-  } catch (error) {
-    logReaderEvent("error", "head-exception", articleUrl, error instanceof Error ? error.message : "Unexpected error");
-    errorText += "Failed to get the article, its server did not return expected details :( <br>";
+  if (cached) {
+    return cached;
   }
 
+  let errorText = "";
   let dom: JSDOM | undefined;
   let article;
 
   try {
-    const articleHtml = await fetchText(articleUrl);
+    const response = await fetchWithTimeout(articleUrl);
+
+    if (!response.ok) {
+      throw new Error(`Request failed with HTTP ${response.status}`);
+    }
+
+    const proxiedDownload = await proxyDownload(articleUrl, response);
+
+    if (proxiedDownload) {
+      return proxiedDownload;
+    }
+
+    const articleHtml = new TextDecoder().decode(await readLimitedBody(response, htmlDownloadMaxBytes));
     logReaderEvent("warn", "get-ok", articleUrl, `fetched ${articleHtml.length} bytes`);
     dom = new JSDOM(articleHtml, { url: articleUrl });
     article = new Readability(dom.window.document, {
@@ -179,7 +192,7 @@ export async function readerPage(articleUrl: string): Promise<string | globalThi
   const readableArticle = rewriteReaderContent(article?.content ?? "");
   const images = Array.from(dom?.window.document.images ?? []).map((image) => image.src);
 
-  return vintagePage(
+  const page = vintagePage(
     title,
     `<p>
 <form action="/read" method="get">
@@ -193,4 +206,10 @@ ${imageLinks(images)}
 ${errorText ? `<p><font color='red'>${errorText}</font></p>` : ""}
 <p><font size="4">${readableArticle}</font></p>`
   );
+
+  if (!errorText) {
+    pageCache.set(key, page);
+  }
+
+  return page;
 }

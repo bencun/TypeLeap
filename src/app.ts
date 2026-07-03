@@ -3,8 +3,77 @@ import { compressedImage, imageViewerPage, isSupportedImageUrl } from "./feature
 import { readerPage } from "./features/reader.js";
 import { searchPage } from "./features/search.js";
 import { aboutPage, homepage } from "./pages/static.js";
+import { cacheKey, pageCache } from "./shared/cache.js";
 import { sendWebResponse, queryValue } from "./shared/http.js";
 import { escapeHtml, vintagePage } from "./shared/html.js";
+
+export type BinaryRouteResult = {
+  buffer: Buffer;
+  contentType: string;
+} | null;
+
+export async function homeRouteHtml(query: string): Promise<string> {
+  if (query) {
+    return searchPage(query);
+  }
+
+  return cachedStaticPage("home", homepage);
+}
+
+export async function readRouteResult(articleUrl: string): Promise<string | globalThis.Response> {
+  if (!articleUrl) {
+    return "What do you think you're doing... >:(";
+  }
+
+  return readerPage(articleUrl);
+}
+
+export function imageRouteHtml(url: string, referer = "/"): string {
+  if (!url || !isSupportedImageUrl(url)) {
+    return vintagePage("TypeLeap Image Viewer", "Image failed :(");
+  }
+
+  const key = cacheKey("image-page", `${url}:${referer}`);
+  const cached = pageCache.get<string>(key);
+
+  if (cached) {
+    return cached;
+  }
+
+  const page = imageViewerPage(url, referer);
+  pageCache.set(key, page);
+  return page;
+}
+
+export async function imageCompressedRouteResult(url: string): Promise<BinaryRouteResult> {
+  const image = url ? await compressedImage(url) : null;
+
+  if (!image) {
+    return null;
+  }
+
+  return {
+    buffer: image.buffer,
+    contentType: image.contentType
+  };
+}
+
+export function aboutRouteHtml(): string {
+  return cachedStaticPage("about", aboutPage);
+}
+
+function cachedStaticPage(name: string, render: () => string): string {
+  const key = cacheKey("static", name);
+  const cached = pageCache.get<string>(key);
+
+  if (cached) {
+    return cached;
+  }
+
+  const page = render();
+  pageCache.set(key, page);
+  return page;
+}
 
 /**
  * Builds the Express application and wires the FrogFind routes.
@@ -18,7 +87,7 @@ export function createApp(): express.Express {
   app.get("/", async (request, response, next) => {
     try {
       const query = queryValue(request, "q");
-      response.type("html").send(query ? await searchPage(query) : homepage());
+      response.type("html").send(await homeRouteHtml(query));
     } catch (error) {
       next(error);
     }
@@ -29,14 +98,7 @@ export function createApp(): express.Express {
    */
   app.get("/read", async (request, response, next) => {
     try {
-      const articleUrl = queryValue(request, "a");
-
-      if (!articleUrl) {
-        response.type("txt").send("What do you think you're doing... >:(");
-        return;
-      }
-
-      const result = await readerPage(articleUrl);
+      const result = await readRouteResult(queryValue(request, "a"));
 
       if (result instanceof globalThis.Response) {
         await sendWebResponse(result, response);
@@ -54,13 +116,7 @@ export function createApp(): express.Express {
    */
   app.get("/image", (request, response) => {
     const url = queryValue(request, "i");
-
-    if (!url || !isSupportedImageUrl(url)) {
-      response.type("html").send(vintagePage("TypeLeap Image Viewer", "Image failed :("));
-      return;
-    }
-
-    response.type("html").send(imageViewerPage(url, request.get("referer") ?? "/"));
+    response.type("html").send(imageRouteHtml(url, request.get("referer") ?? "/"));
   });
 
   /**
@@ -69,7 +125,7 @@ export function createApp(): express.Express {
   app.get("/image-compressed", async (request, response, next) => {
     try {
       const url = queryValue(request, "i");
-      const image = url ? await compressedImage(url) : null;
+      const image = await imageCompressedRouteResult(url);
 
       if (!image) {
         response.status(url && isSupportedImageUrl(url) ? 415 : 400).end();
@@ -86,7 +142,7 @@ export function createApp(): express.Express {
    * Serves the TypeLeap about page.
    */
   app.get("/about", (_request, response) => {
-    response.type("html").send(aboutPage());
+    response.type("html").send(aboutRouteHtml());
   });
 
   /**

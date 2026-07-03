@@ -1,5 +1,6 @@
 import sharp from "sharp";
 import { allowedImageExtensions } from "../config.js";
+import { cacheKey, pageCache } from "../shared/cache.js";
 import { fetchBuffer } from "../shared/http.js";
 import { escapeHtml, vintagePage } from "../shared/html.js";
 import { isHttpUrl } from "../shared/url.js";
@@ -41,6 +42,13 @@ export async function compressedImage(url: string): Promise<{ buffer: Buffer; co
     return null;
   }
 
+  const key = cacheKey("image", url);
+  const cached = pageCache.get<{ buffer: Buffer; contentType: "jpg" | "png" }>(key);
+
+  if (cached) {
+    return cached;
+  }
+
   const { data, contentType } = await fetchBuffer(url);
   const sourceImage = sharp(Buffer.from(data));
   const metadata = await sourceImage.metadata();
@@ -57,8 +65,12 @@ export async function compressedImage(url: string): Promise<{ buffer: Buffer; co
   });
 
   if (contentType === "image/png" || url.toLowerCase().includes(".png")) {
-    return { buffer: await resized.png({ compressionLevel: 8 }).toBuffer(), contentType: "png" };
+    const image = { buffer: await resized.png({ compressionLevel: 8 }).toBuffer(), contentType: "png" as const };
+    pageCache.set(key, image);
+    return image;
   }
 
-  return { buffer: await resized.jpeg({ quality: 80 }).toBuffer(), contentType: "jpg" };
+  const image = { buffer: await resized.jpeg({ quality: 80 }).toBuffer(), contentType: "jpg" as const };
+  pageCache.set(key, image);
+  return image;
 }

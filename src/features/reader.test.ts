@@ -19,8 +19,8 @@ describe("rewriteReaderContent", () => {
 });
 
 describe("proxyDownload", () => {
-  it("skips non-ok HEAD responses", async () => {
-    const headResponse = new Response("<html>blocked</html>", {
+  it("skips non-ok GET responses", async () => {
+    const response = new Response("<html>blocked</html>", {
       status: 403,
       headers: {
         "content-type": "text/html",
@@ -28,6 +28,6 @@ describe("proxyDownload", () => {
       }
     });
 
-    await expect(proxyDownload("https://example.com/article", headResponse)).resolves.toBeNull();
+    await expect(proxyDownload("https://example.com/article", response)).resolves.toBeNull();
   });
 });

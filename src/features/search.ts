@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import { searchForm } from "../pages/static.js";
+import { cacheKey, pageCache } from "../shared/cache.js";
 import { fetchText } from "../shared/http.js";
 import { cleanText, escapeHtml, vintagePage } from "../shared/html.js";
 
@@ -55,6 +56,13 @@ export function parseSearchResults(html: string): SearchResult[] {
  * Fetches DuckDuckGo results and renders the vintage search page.
  */
 export async function searchPage(query: string): Promise<string> {
+  const key = cacheKey("search", query);
+  const cached = pageCache.get<string>(key);
+
+  if (cached) {
+    return cached;
+  }
+
   let errorText = "";
   let results: SearchResult[] = [];
 
@@ -76,7 +84,7 @@ export async function searchPage(query: string): Promise<string> {
           .join("")
       : "<br>No results found.<br><br><hr>";
 
-  return vintagePage(
+  const page = vintagePage(
     "TypeLeap!",
     `${searchForm(query)}
 <hr>
@@ -87,4 +95,10 @@ ${errorText ? `<p><font color='red'>${errorText}</font></p>` : ""}
 <hr>
 ${resultHtml}`
   );
+
+  if (!errorText) {
+    pageCache.set(key, page);
+  }
+
+  return page;
 }
