@@ -8,8 +8,9 @@ The current version is a one-shotted vibe-coded port of the original. Completely
 ## Run locally
 
 ```sh
-npm install
-npm run dev
+corepack enable
+pnpm install
+pnpm run dev
 ```
 
 Open `http://localhost:3000`.
@@ -17,8 +18,8 @@ Open `http://localhost:3000`.
 ## Build and run
 
 ```sh
-npm run build
-npm start
+pnpm run build
+pnpm start
 ```
 
 ## Docker
